@@ -1,0 +1,1 @@
+This repository contains a self-contained Eclipse project that holds several Java programs to test JOGL2 functionality
