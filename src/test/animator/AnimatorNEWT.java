@@ -1,10 +1,6 @@
 package test.animator;
 
-import java.awt.BorderLayout;
 import java.awt.EventQueue;
-import java.awt.Frame;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.FloatBuffer;
 
@@ -16,15 +12,17 @@ import javax.media.opengl.GLCapabilities;
 import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.GLUniformData;
-import javax.media.opengl.awt.GLCanvas;
 
+import com.jogamp.newt.event.WindowAdapter;
+import com.jogamp.newt.event.WindowEvent;
+import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.Animator;
 import com.jogamp.opengl.util.GLArrayDataServer;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.glsl.ShaderState;
 
-public class AnimatorTest {
+public class AnimatorNEWT {
   private int width = 500;
   private int height = 290;
   
@@ -39,11 +37,10 @@ public class AnimatorTest {
   private long millisInit;
   private int frameCount;
   
-  private Frame frame;
-  private GLCanvas canvas;
+  private GLWindow window;
   
   private int fcount, lastm;  
-  private int fint = 3; 
+  private int fint = 1; 
   private float frameRate;
   
   void setup(GL2ES2 gl) {
@@ -77,7 +74,7 @@ public class AnimatorTest {
   }
   
   void draw(GL2ES2 gl) {    
-    frame.setTitle("Animator Test - frame: " + frameCount +" - fps: " + frameRate);
+    window.setTitle("NEWT Animator Test - frame: " + frameCount +" - fps: " + frameRate);
     
     gl.glClearColor(0, 0, 0, 1);
     gl.glClear(GL2ES2.GL_COLOR_BUFFER_BIT);
@@ -115,44 +112,38 @@ public class AnimatorTest {
   }
   
   public void run() throws InterruptedException, InvocationTargetException {
-    frame = new Frame("Animator Test");
-    frame.setLocation(100, 100);
-    frame.setSize(width, height);    
-    
     GLProfile profile = GLProfile.getDefault();
     GLCapabilities capabilities = new GLCapabilities(profile);
+    window = GLWindow.create(capabilities); 
     
-    canvas = new GLCanvas(capabilities);
-    canvas.setBounds(0, 0, width, height);
-    canvas.setFocusable(true);    
-    
-    frame.setLayout(new BorderLayout());
-    frame.add(canvas, BorderLayout.CENTER);
+    window.setTitle("NEWT Animator Test");
+    window.setPosition(100, 100);
+    window.setSize(width, height);    
     
     TestGLListener glListener = new TestGLListener();
-    canvas.addGLEventListener(glListener);    
-    final GLAnimatorControl animator = new Animator(canvas);
+    window.addGLEventListener(glListener);    
+    final GLAnimatorControl animator = new Animator(window);
     animator.start();
     
-    frame.addWindowListener(new WindowAdapter() {
-      public void windowClosing(WindowEvent e) {
+    window.addWindowListener(new WindowAdapter() {
+      @Override
+      public void windowDestroyNotify(final WindowEvent e) {
         animator.stop();
         System.exit(0);
       }
-    }); 
+    });
     
     EventQueue.invokeAndWait(new Runnable() {
       public void run() {
-        frame.validate();                
-        frame.setVisible(true);
+        window.setVisible(true);
     }});
   }
   
   public static void main(String[] args) {
-    AnimatorTest test;
+    AnimatorNEWT test;
     try {
-      Class<?> c = Thread.currentThread().getContextClassLoader().loadClass(AnimatorTest.class.getName());
-      test = (AnimatorTest) c.newInstance();
+      Class<?> c = Thread.currentThread().getContextClassLoader().loadClass(AnimatorNEWT.class.getName());
+      test = (AnimatorNEWT) c.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }    
