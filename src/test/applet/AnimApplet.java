@@ -65,8 +65,8 @@ public class AnimApplet extends Applet {
   private GLUniformData time;  
   private GLArrayDataServer vertices;   
   
-  int fcount = 0, lastm = 0;  
-  int fint = 3;  
+  private int fcount = 0, lastm = 0;  
+  private int fint = 1;
   
   public void init() {
     setSize(APPLET_WIDTH, APPLET_HEIGHT);
