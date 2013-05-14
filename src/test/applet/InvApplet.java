@@ -26,6 +26,7 @@ import javax.media.opengl.GLProfile;
 import javax.media.opengl.GLRunnable;
 import javax.media.opengl.GLUniformData;
 import javax.media.opengl.awt.GLCanvas;
+import javax.media.opengl.glu.GLU;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
@@ -54,6 +55,7 @@ public class InvApplet extends Applet implements Runnable {
   private NewtCanvasAWT newtCanvas;
   private DrawRunnable drawRunnable;
   private GLContext context;
+  public GLU glu;
   
   private int width;
   private int height;
@@ -170,6 +172,7 @@ public class InvApplet extends Applet implements Runnable {
       } else {
         setup(drawable.getGL().getGL2ES2());
       }      
+      checkGLErrors(drawable.getGL());
       
       if (MANUAL_FRAME_HANDLING) {
         swapBuffers();
@@ -296,6 +299,7 @@ public class InvApplet extends Applet implements Runnable {
       // Disables vsync
       gl.setSwapInterval(0);  
     }
+    glu = new GLU();
     
     vertShader = ShaderCode.create(gl, GL2ES2.GL_VERTEX_SHADER, this.getClass(), "shaders",
         "shaders/bin", "landscape", true);
@@ -354,6 +358,15 @@ public class InvApplet extends Applet implements Runnable {
                          "FrameRate: " + frameRate);
     }    
   }  
+  
+  
+  private void checkGLErrors(GL gl) {
+    int err = gl.glGetError();
+    if (err != 0) {
+      String errString = glu.gluErrorString(err);
+      System.out.println(errString);
+    }    
+  }
   
   static public void main(String[] args) {    
     GraphicsEnvironment environment = 
