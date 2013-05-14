@@ -21,6 +21,7 @@ import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.GLUniformData;
 import javax.media.opengl.awt.GLCanvas;
+import javax.media.opengl.glu.GLU;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
@@ -49,6 +50,7 @@ public class AnimApplet extends Applet {
   private NewtCanvasAWT newtCanvas;
   private DrawListener drawListener;
   private FPSAnimator animator;
+  private GLU glu;
   
   private int width;
   private int height;
@@ -88,10 +90,12 @@ public class AnimApplet extends Applet {
   private class DrawListener implements GLEventListener {
     public void display(GLAutoDrawable drawable) {
       draw(drawable.getGL().getGL2ES2());
+      checkGLErrors(drawable.getGL());
     }
     public void dispose(GLAutoDrawable drawable) { }
     public void init(GLAutoDrawable drawable) { 
       setup(drawable.getGL().getGL2ES2());
+      checkGLErrors(drawable.getGL());
     }
     public void reshape(GLAutoDrawable drawable, int x, int y, int w, int h) { }    
   }  
@@ -185,6 +189,14 @@ public class AnimApplet extends Applet {
     }    
   }  
   
+  private void checkGLErrors(GL gl) {
+    int err = gl.glGetError();
+    if (err != 0) {
+      String errString = glu.gluErrorString(err);
+      System.out.println(errString);
+    }    
+  }
+   
   static public void main(String[] args) {    
     GraphicsEnvironment environment = 
         GraphicsEnvironment.getLocalGraphicsEnvironment();

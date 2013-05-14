@@ -55,7 +55,7 @@ public class InvApplet extends Applet implements Runnable {
   private NewtCanvasAWT newtCanvas;
   private DrawRunnable drawRunnable;
   private GLContext context;
-  public GLU glu;
+  private GLU glu;
   
   private int width;
   private int height;
@@ -358,8 +358,7 @@ public class InvApplet extends Applet implements Runnable {
                          "FrameRate: " + frameRate);
     }    
   }  
-  
-  
+    
   private void checkGLErrors(GL gl) {
     int err = gl.glGetError();
     if (err != 0) {
