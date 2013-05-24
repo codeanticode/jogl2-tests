@@ -4,6 +4,7 @@ import java.applet.Applet;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.Frame;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
@@ -12,27 +13,30 @@ import java.awt.Rectangle;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.nio.FloatBuffer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCapabilities;
-import javax.media.opengl.GLEventListener;
+import javax.media.opengl.GLContext;
+import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
+import javax.media.opengl.GLRunnable;
 import javax.media.opengl.GLUniformData;
 import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.glu.GLU;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
-import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.GLArrayDataServer;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.glsl.ShaderState;
 
 @SuppressWarnings("serial")
-public class AnimApplet extends Applet {
+public class AppletInvoke extends Applet implements Runnable {
   static public int AWT  = 0;
   static public int NEWT = 1;
   
@@ -40,21 +44,27 @@ public class AnimApplet extends Applet {
   static public int APPLET_HEIGHT = 290;
   static public int TARGET_FPS    = 120;
   static public int TOOLKIT       = NEWT;
+  static public boolean MANUAL_FRAME_HANDLING = true;
   
   //////////////////////////////////////////////////////////////////////////////
   
   static private Frame frame;
-  static private AnimApplet applet;
+  static private AppletInvoke applet;
   private GLCanvas awtCanvas;
   private GLWindow newtWindow;
   private NewtCanvasAWT newtCanvas;
-  private DrawListener drawListener;
-  private FPSAnimator animator;
+  private DrawRunnable drawRunnable;
+  private GLContext context;
   private GLU glu;
   
   private int width;
   private int height;
+  private Thread thread;
   
+  private boolean doneInit = false;
+  private boolean doneSetup = false;
+  
+  private long frameRatePeriod = 1000000000L / TARGET_FPS;
   private long millisOffset;
   private int frameCount;
   private float frameRate;
@@ -68,8 +78,8 @@ public class AnimApplet extends Applet {
   private GLArrayDataServer vertices;   
   
   private int fcount = 0, lastm = 0;  
-  private int fint = 1;
-  
+  private int fint = 1; 
+    
   public void init() {
     setSize(APPLET_WIDTH, APPLET_HEIGHT);
     setPreferredSize(new Dimension(APPLET_WIDTH, APPLET_HEIGHT));
@@ -78,36 +88,156 @@ public class AnimApplet extends Applet {
   }
   
   public void start() {
-    if (TOOLKIT == AWT) {
-      animator = new FPSAnimator(awtCanvas, TARGET_FPS);
-      animator.start();      
-    } else if (TOOLKIT == AWT) {
-      animator = new FPSAnimator(newtWindow, TARGET_FPS);
-      animator.start();      
+    thread = new Thread(this, "Animation Thread");
+    thread.start();    
+  }
+  
+  public void run() {    
+    int noDelays = 0;
+    // Number of frames with a delay of 0 ms before the
+    // animation thread yields to other running threads.
+    final int NO_DELAYS_PER_YIELD = 15;
+    final int TIMEOUT_SECONDS = 2;
+    
+    long beforeTime = System.nanoTime();
+    long overSleepTime = 0L;
+    
+    millisOffset = System.currentTimeMillis();
+    frameCount = 1;
+    while (Thread.currentThread() == thread) {
+      final CountDownLatch latch = new CountDownLatch(1);
+      requestDraw(latch);
+      try {
+        latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      
+      if (frameCount == 1) {
+        EventQueue.invokeLater(new Runnable() {
+          public void run() {
+            requestFocusInWindow();
+          }
+        });
+      }      
+      
+      long afterTime = System.nanoTime();
+      long timeDiff = afterTime - beforeTime;
+      long sleepTime = (frameRatePeriod - timeDiff) - overSleepTime;      
+      if (sleepTime > 0) {  // some time left in this cycle
+        try {
+          Thread.sleep(sleepTime / 1000000L, (int) (sleepTime % 1000000L));
+          noDelays = 0;  // Got some sleep, not delaying anymore
+        } catch (InterruptedException ex) { }
+        overSleepTime = (System.nanoTime() - afterTime) - sleepTime;
+      } else {    // sleepTime <= 0; the frame took longer than the period
+        overSleepTime = 0L;
+        noDelays++;
+        if (noDelays > NO_DELAYS_PER_YIELD) {
+          Thread.yield();   // give another thread a chance to run
+          noDelays = 0;
+        }
+      }      
+      beforeTime = System.nanoTime();
     }
   }
   
-  private class DrawListener implements GLEventListener {
-    public void display(GLAutoDrawable drawable) {
-      draw(drawable.getGL().getGL2ES2());
-      checkGLErrors(drawable.getGL());
+  public void requestDraw(CountDownLatch latch) {
+    if (!doneInit) {
+      initDraw();
     }
-    public void dispose(GLAutoDrawable drawable) { }
-    public void init(GLAutoDrawable drawable) { 
-      setup(drawable.getGL().getGL2ES2());
-      checkGLErrors(drawable.getGL());
+    
+    if (TOOLKIT == AWT) {      
+      awtCanvas.invoke(true, drawRunnable);      
+    } else if (TOOLKIT == NEWT) {     
+      newtWindow.invoke(true, drawRunnable);      
     }
-    public void reshape(GLAutoDrawable drawable, int x, int y, int w, int h) { }    
-  }  
+    
+    if (latch != null) {
+      latch.countDown();
+    }    
+  }
   
-   private void initGL() {
+  private class DrawRunnable implements GLRunnable {
+    private boolean notCurrent;
+    
+    @Override
+    public boolean run(GLAutoDrawable drawable) {
+      if (MANUAL_FRAME_HANDLING) {
+        makeContextCurrent();     
+      }
+      
+      if (doneSetup) {
+        draw(drawable.getGL().getGL2ES2());
+      } else {
+        setup(drawable.getGL().getGL2ES2());
+      }      
+      checkGLErrors(drawable.getGL());
+      
+      if (MANUAL_FRAME_HANDLING) {
+        swapBuffers();
+        releaseCurrentContext();
+      }
+      
+      return true;
+    }
+    
+    private void makeContextCurrent() {
+      int MAX_CONTEXT_GRAB_ATTEMPTS = 10;
+          
+      if (context.isCurrent()) {
+        notCurrent = false;
+      } else {
+        notCurrent = true;
+        int value = GLContext.CONTEXT_NOT_CURRENT;
+        int attempt = 0;
+        do {
+          try {
+            value = context.makeCurrent();
+            System.out.println("Made context current");
+          } catch (final GLException gle) {
+            gle.printStackTrace();
+          } finally {
+            attempt++;
+            if (attempt == MAX_CONTEXT_GRAB_ATTEMPTS) {
+              throw new RuntimeException("Failed to claim OpenGL context.");
+            }
+          }
+          try {
+            Thread.sleep(5);
+          } catch (final InterruptedException e) {
+            e.printStackTrace();
+          }
+          
+        } while (value == GLContext.CONTEXT_NOT_CURRENT);
+      }   
+    }
+    
+    private void swapBuffers() {
+      final GL gl = GLContext.getCurrentGL();
+      gl.glFlush();
+      GLContext.getCurrent().getGLDrawable().swapBuffers();      
+    }
+    
+    private void releaseCurrentContext() {
+      if (notCurrent) {
+        try {
+          context.release();
+          System.out.println("Released context");
+        } catch (final GLException gle) {
+          gle.printStackTrace();
+        }
+      }      
+    }
+  }
+  
+  private void initGL() {
     GLProfile profile = GLProfile.getDefault();
     GLCapabilities caps = new GLCapabilities(profile);
     caps.setBackgroundOpaque(true);
     caps.setOnscreen(true);
     caps.setSampleBuffers(false);
     
-    drawListener = new DrawListener();
     if (TOOLKIT == AWT) {
       awtCanvas = new GLCanvas(caps);
       awtCanvas.setBounds(0, 0, applet.width, applet.height);
@@ -117,7 +247,10 @@ public class AnimApplet extends Applet {
       applet.setLayout(new BorderLayout());
       applet.add(awtCanvas, BorderLayout.CENTER);
       
-      awtCanvas.addGLEventListener(drawListener);      
+      if (MANUAL_FRAME_HANDLING) {
+        awtCanvas.setIgnoreRepaint(true);
+        awtCanvas.setAutoSwapBufferMode(false);        
+      }
     } else if (TOOLKIT == NEWT) {      
       newtWindow = GLWindow.create(caps);      
       newtCanvas = new NewtCanvasAWT(newtWindow);
@@ -127,16 +260,53 @@ public class AnimApplet extends Applet {
 
       applet.setLayout(new BorderLayout());
       applet.add(newtCanvas, BorderLayout.CENTER);
-
-      newtWindow.addGLEventListener(drawListener);
+      
+      if (MANUAL_FRAME_HANDLING) {
+        newtCanvas.setIgnoreRepaint(true);
+        newtWindow.setAutoSwapBufferMode(false);        
+      }
     }
   }
   
+  private void initDraw() {
+    if (TOOLKIT == AWT) {
+      awtCanvas.setVisible(true);
+      // Force the realization
+      awtCanvas.display();
+      if (awtCanvas.getDelegatedDrawable().isRealized()) {
+        // Request the focus here as it cannot work when the window is not visible
+        awtCanvas.requestFocus();
+        context = awtCanvas.getContext();
+      }      
+    } else if (TOOLKIT == NEWT) {
+      newtCanvas.setVisible(true);
+      // Force the realization
+      newtWindow.display();
+      if (newtWindow.isRealized()) {
+        // Request the focus here as it cannot work when the window is not visible
+        newtCanvas.requestFocus();
+        context = newtWindow.getContext();
+      }
+    }
+    
+    drawRunnable = new DrawRunnable();
+    
+    doneInit = true;
+  }
+  
   private void setup(GL2ES2 gl) {
+    if (60 < TARGET_FPS) {
+      // Disables vsync
+      gl.setSwapInterval(0);  
+    }
+    glu = new GLU();
+    
     vertShader = ShaderCode.create(gl, GL2ES2.GL_VERTEX_SHADER, this.getClass(), "shaders",
         "shaders/bin", "landscape", true);
+//        "shaders/bin", "blank", true);
     fragShader = ShaderCode.create(gl, GL2ES2.GL_FRAGMENT_SHADER, this.getClass(), "shaders",
         "shaders/bin", "landscape", true);
+//        "shaders/bin", "blank", true);
     shaderProg = new ShaderProgram();
     shaderProg.add(gl, vertShader, System.err);
     shaderProg.add(gl, fragShader, System.err); 
@@ -158,6 +328,8 @@ public class AnimApplet extends Applet {
     vertices.putf(+1.0f); vertices.putf(+1.0f);
     vertices.seal(gl, true);
     shaderState.ownAttribute(vertices, true);
+    
+    doneSetup = true;
   }
 
   private void draw(GL2ES2 gl) {
@@ -188,7 +360,7 @@ public class AnimApplet extends Applet {
                          "FrameRate: " + frameRate);
     }    
   }  
-  
+    
   private void checkGLErrors(GL gl) {
     int err = gl.glGetError();
     if (err != 0) {
@@ -196,7 +368,7 @@ public class AnimApplet extends Applet {
       System.out.println(errString);
     }    
   }
-   
+  
   static public void main(String[] args) {    
     GraphicsEnvironment environment = 
         GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -204,12 +376,12 @@ public class AnimApplet extends Applet {
 
     frame = new Frame(displayDevice.getDefaultConfiguration());
     frame.setBackground(new Color(0xCC, 0xCC, 0xCC));
-    frame.setTitle("Test Applet");
+    frame.setTitle("Invoke Applet");
     
     try {
       Class<?> c = Thread.currentThread().getContextClassLoader().
-          loadClass(AnimApplet.class.getName());
-      applet = (AnimApplet) c.newInstance();
+          loadClass(AppletInvoke.class.getName());
+      applet = (AppletInvoke) c.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }    
@@ -238,13 +410,12 @@ public class AnimApplet extends Applet {
     // This allows to close the frame.
     frame.addWindowListener(new WindowAdapter() {
       public void windowClosing(WindowEvent e) {
-        applet.animator.stop();
         System.exit(0);
       }
     });
         
     applet.initGL();
     frame.setVisible(true);
-    applet.start();
+    applet.start();    
   }
 }
