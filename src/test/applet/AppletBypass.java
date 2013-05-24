@@ -43,7 +43,7 @@ public class AppletBypass extends Applet implements Runnable {
   static public int APPLET_WIDTH  = 500;
   static public int APPLET_HEIGHT = 290;
   static public int TARGET_FPS    = 120;
-  static public int TOOLKIT       = AWT;
+  static public int TOOLKIT       = NEWT;
   static public boolean MANUAL_FRAME_HANDLING = false;
   
   //////////////////////////////////////////////////////////////////////////////
@@ -376,7 +376,7 @@ public class AppletBypass extends Applet implements Runnable {
 
     frame = new Frame(displayDevice.getDefaultConfiguration());
     frame.setBackground(new Color(0xCC, 0xCC, 0xCC));
-    frame.setTitle("Invoke Applet");
+    frame.setTitle("Bypass Applet");
     
     try {
       Class<?> c = Thread.currentThread().getContextClassLoader().
