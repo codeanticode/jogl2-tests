@@ -10,8 +10,6 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
 import java.awt.Rectangle;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.nio.FloatBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -29,21 +27,23 @@ import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.glu.GLU;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
+import com.jogamp.newt.event.WindowAdapter;
+import com.jogamp.newt.event.WindowEvent;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.GLArrayDataServer;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.glsl.ShaderState;
 
-//GLCanvas/GLWindow embedded inside a frame, which also contains the applet 
-// object. The rendering loop is driven by the application.
+// Uses a stand-alone GLWindow that is not parented to any AWT component in the
+// application.
 @SuppressWarnings("serial")
-public class AppletBypass extends Applet implements Runnable {
+public class AppletSepGLWin extends Applet implements Runnable {
   static public int AWT  = 0;
   static public int NEWT = 1;
   
-  static public int APPLET_WIDTH  = 500;
-  static public int APPLET_HEIGHT = 290;
+  static public int APPLET_WIDTH  = 640;
+  static public int APPLET_HEIGHT = 360;
   static public int TARGET_FPS    = 120;
   static public int TOOLKIT       = NEWT;
   static public boolean MANUAL_FRAME_HANDLING = false;
@@ -51,7 +51,7 @@ public class AppletBypass extends Applet implements Runnable {
   //////////////////////////////////////////////////////////////////////////////
   
   static private Frame frame;
-  static private AppletBypass applet;
+  static private AppletSepGLWin applet;
   private GLCanvas awtCanvas;
   private GLWindow newtWindow;
   private NewtCanvasAWT newtCanvas;
@@ -255,13 +255,27 @@ public class AppletBypass extends Applet implements Runnable {
       }
     } else if (TOOLKIT == NEWT) {      
       newtWindow = GLWindow.create(caps);      
-      newtCanvas = new NewtCanvasAWT(newtWindow);
-      newtCanvas.setBounds(0, 0, applet.width, applet.height);
-      newtCanvas.setBackground(new Color(0xFFCCCCCC, true));
-      newtCanvas.setFocusable(true);
+      newtWindow.setSize(applet.width, applet.height);
+      
+      newtWindow.setPosition(50, 50);
+      //newtWindow.setUndecorated(true);
+      //newtWindow.setFullscreen(true); // only after visible
+      
+//      newtCanvas = new NewtCanvasAWT(newtWindow);
+//      newtCanvas.setBounds(0, 0, applet.width, applet.height);
+//      newtCanvas.setBackground(new Color(0xFFCCCCCC, true));
+//      newtCanvas.setFocusable(true);
 
-      frame.setLayout(new BorderLayout());
-      frame.add(newtCanvas, BorderLayout.CENTER);
+//      frame.setLayout(new BorderLayout());
+//      frame.add(newtCanvas, BorderLayout.CENTER);
+      
+      // This allows to close the frame.
+      newtWindow.addWindowListener(new WindowAdapter() {
+        @Override
+        public void windowDestroyNotify(final WindowEvent e) {
+          System.exit(0);
+        }
+      });
       
       if (MANUAL_FRAME_HANDLING) {
         newtCanvas.setIgnoreRepaint(true);
@@ -281,12 +295,14 @@ public class AppletBypass extends Applet implements Runnable {
         context = awtCanvas.getContext();
       }      
     } else if (TOOLKIT == NEWT) {
-      newtCanvas.setVisible(true);
+      //newtCanvas.setVisible(true);
+      newtWindow.setVisible(true);
       // Force the realization
-      newtWindow.display();
+      newtWindow.display();      
       if (newtWindow.isRealized()) {
         // Request the focus here as it cannot work when the window is not visible
-        newtCanvas.requestFocus();
+        //newtCanvas.requestFocus();
+        newtWindow.requestFocus();
         context = newtWindow.getContext();
       }
     }
@@ -382,8 +398,8 @@ public class AppletBypass extends Applet implements Runnable {
     
     try {
       Class<?> c = Thread.currentThread().getContextClassLoader().
-          loadClass(AppletBypass.class.getName());
-      applet = (AppletBypass) c.newInstance();
+          loadClass(AppletSepGLWin.class.getName());
+      applet = (AppletSepGLWin) c.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }    
@@ -410,16 +426,16 @@ public class AppletBypass extends Applet implements Runnable {
                      applet.width, applet.height);
     
     // This allows to close the frame.
-    frame.addWindowListener(new WindowAdapter() {
-      public void windowClosing(WindowEvent e) {
-        System.exit(0);
-      }
-    });
+//    frame.addWindowListener(new WindowAdapter() {
+//      public void windowClosing(WindowEvent e) {
+//        System.exit(0);
+//      }
+//    });
         
     applet.initGL();
     //frame.pack();
-    frame.setResizable(false);    
-    frame.setVisible(true);
+    //frame.setResizable(false);    
+    //frame.setVisible(true);
     applet.start();    
   }
 }

@@ -35,6 +35,9 @@ import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.glsl.ShaderState;
 
+//GLCanvas/GLWindow embedded inside an Applet/Frame. The rendering loop is 
+// driven by the application, and the callback function with the GL code is
+// pased to JOGL using GLCanvas/GLWindow.invoke().
 @SuppressWarnings("serial")
 public class AppletInvoke extends Applet implements Runnable {
   static public int AWT  = 0;
