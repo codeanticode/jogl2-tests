@@ -46,6 +46,8 @@ public class AnimatorAWT {
   private int fint = 1; 
   private float frameRate;
   
+  private boolean resized;
+  
   void setup(GL2ES2 gl) {
     vertShader = ShaderCode.create(gl, GL2ES2.GL_VERTEX_SHADER, this.getClass(), "shaders",
         "shaders/bin", "landscape", true);
@@ -60,7 +62,7 @@ public class AnimatorAWT {
     
     resolution = new GLUniformData("iResolution", 3, FloatBuffer.wrap(new float[] {width, height, 0}));
     shaderState.ownUniform(resolution);
-    shaderState.uniform(gl, resolution);    
+    shaderState.uniform(gl, resolution);
     
     time = new GLUniformData("iGlobalTime", 0.0f);
     shaderState.ownUniform(time);
@@ -86,6 +88,11 @@ public class AnimatorAWT {
     
     time.setData((System.currentTimeMillis() - millisInit) / 1000.0f);
     shaderState.uniform(gl, time);
+    if (resized) {
+      shaderState.uniform(gl, resolution);
+      resized = false;
+    }
+    
     vertices.enableBuffer(gl, true);
     gl.glDrawArrays(GL2ES2.GL_TRIANGLE_STRIP, 0, 4);
     vertices.enableBuffer(gl, false);
@@ -111,7 +118,12 @@ public class AnimatorAWT {
     public void init(GLAutoDrawable drawable) { 
       setup(drawable.getGL().getGL2ES2());
     }
-    public void reshape(GLAutoDrawable drawable, int x, int y, int w, int h) { }    
+    public void reshape(GLAutoDrawable drawable, int x, int y, int w, int h) {
+      width = w;
+      height = h;
+      resolution.setData(FloatBuffer.wrap(new float[] {width, height, 0}));  
+      resized = true;
+    }    
   }
   
   public void run() throws InterruptedException, InvocationTargetException {
