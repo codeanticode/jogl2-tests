@@ -10,15 +10,13 @@ import java.nio.FloatBuffer;
 
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
-import javax.media.opengl.GLAnimatorControl;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCapabilities;
 import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.GLUniformData;
 import javax.media.opengl.awt.GLCanvas;
-
-import com.jogamp.opengl.util.Animator;
+import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.GLArrayDataServer;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
@@ -37,14 +35,10 @@ public class AnimatorAWT {
   private GLArrayDataServer vertices;
   
   private long millisInit;
-  private int frameCount;
   
   private Frame frame;
   private GLCanvas canvas;
-  
-  private int fcount, lastm;  
-  private int fint = 1; 
-  private float frameRate;
+  private FPSAnimator animator;
   
   private boolean resized;
   
@@ -79,7 +73,7 @@ public class AnimatorAWT {
   }
   
   void draw(GL2ES2 gl) {    
-    frame.setTitle("Animator Test - frame: " + frameCount +" - fps: " + frameRate);
+    frame.setTitle("NEWT Animator Test - frame: " + animator.getTotalFPSFrames() +" - fps: " + animator.getLastFPS());
     
     gl.glClearColor(0, 0, 0, 1);
     gl.glClear(GL2ES2.GL_COLOR_BUFFER_BIT);
@@ -98,16 +92,6 @@ public class AnimatorAWT {
     vertices.enableBuffer(gl, false);
     
     shaderState.useProgram(gl, false);
-    
-    fcount += 1;
-    int m = (int) (System.currentTimeMillis() - millisInit);
-    if (m - lastm > 1000 * fint) {
-      frameRate = (float)(fcount) / fint;
-      fcount = 0;
-      lastm = m;
-    }      
-    
-    frameCount++;
   }
   
   class TestGLListener implements GLEventListener {
@@ -143,7 +127,8 @@ public class AnimatorAWT {
     
     TestGLListener glListener = new TestGLListener();
     canvas.addGLEventListener(glListener);    
-    final GLAnimatorControl animator = new Animator(canvas);
+    animator = new FPSAnimator(canvas, 60);
+    animator.setUpdateFPSFrames(10, System.out);
     animator.start();
     
     frame.addWindowListener(new WindowAdapter() {
