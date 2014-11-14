@@ -1,0 +1,7 @@
+uniform vec2 mouse;
+
+attribute vec2 vertex;
+
+void main() {
+  gl_Position = vec4(vertex + mouse, 0, 1);
+}
