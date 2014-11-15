@@ -29,11 +29,11 @@ import com.jogamp.opengl.util.glsl.ShaderState;
 
 // com.jogamp.opengl.test.junit.newt.mm.TestScreenMode01cNEWT 
 public class MouseNEWT {
-  private int width = 1440 * 4;
-  private int height = 900;
+//  private int width = 1440;
+//  private int height = 900;
 
-//  private int width = 640;
-//  private int height = 360;
+  private int width = 1920 * 6;
+  private int height = 1080;
 
   
   private ShaderCode vertShader;
@@ -42,6 +42,7 @@ public class MouseNEWT {
   private ShaderState shaderState;
   private GLUniformData mouse;
   private GLArrayDataServer vertices;
+  private int mouseX, mouseY;
   
   private GLWindow window;
   private FPSAnimator animator;
@@ -73,7 +74,9 @@ public class MouseNEWT {
   
   void draw(GL2ES2 gl) {    
 //    window.setTitle("NEWT Animator Test - frame: " + animator.getTotalFPSFrames() +" - fps: " + animator.getLastFPS());
-    window.setTitle(window.getWidth() + " " + window.getHeight() + "|" + window.getSurfaceWidth() + " " + window.getSurfaceHeight());
+    window.setTitle(window.getWidth() + " " + window.getHeight() + " | " + 
+                    window.getSurfaceWidth() + " " + window.getSurfaceHeight() + " - " +
+                    mouseX + ", " +  mouseY);
     
     gl.glClearColor(0, 0, 0, 1);
     gl.glClear(GL2ES2.GL_COLOR_BUFFER_BIT);
@@ -105,6 +108,8 @@ public class MouseNEWT {
     }
     @Override
     public void mouseMoved(com.jogamp.newt.event.MouseEvent e) {
+      mouseX = e.getX();
+      mouseY = e.getY();
       float x = ((float)e.getX() - width) / width; 
       float y = 1 - (float)e.getY() / height;
       mouse.setData(FloatBuffer.wrap(new float[] {x, y}));      
@@ -157,13 +162,15 @@ public class MouseNEWT {
     
     window = GLWindow.create(screen, capabilities);    
     window.setTitle("NEWT Animator Test");
+    window.setPosition(0, -400);
     window.setSize(width, height);
-    window.setPosition(0, 0);
+    
+    window.setVisible(true);
 //    window.setTopLevelPosition(0, 0);
         
     
     MonitorDevice monitor = window.getMainMonitor();
-    System.out.println(monitor);
+    System.out.println("Main monitor: " + monitor.toString());
     
 //    boolean spanAcrossMonitors = false;
 //    if (spanAcrossMonitors) {
@@ -226,10 +233,10 @@ public class MouseNEWT {
       }
     });
     
-    EventQueue.invokeAndWait(new Runnable() {
-      public void run() {
-        window.setVisible(true);
-    }});
+//    EventQueue.invokeAndWait(new Runnable() {
+//      public void run() {
+//        window.setVisible(true);
+//    }});
   }
   
   public static void main(String[] args) {
