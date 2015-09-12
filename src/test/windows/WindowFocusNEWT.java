@@ -73,7 +73,6 @@ public class WindowFocusNEWT {
     window = GLWindow.create(capabilities); 
     
     window.setTitle("Focus test");
-    window.setPosition(100, 100);
     window.setSize(width, height);    
     
     NEWTMouseListener mouseListener = new NEWTMouseListener();
@@ -83,6 +82,7 @@ public class WindowFocusNEWT {
     window.addGLEventListener(glListener);    
     animator = new FPSAnimator(window, 60);
     animator.start();
+    window.setPosition(100, 100);
     
     window.addWindowListener(new WindowAdapter() {
       @Override
