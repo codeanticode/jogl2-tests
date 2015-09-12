@@ -14,7 +14,7 @@ import com.jogamp.newt.event.WindowEvent;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.FPSAnimator;
 
-public class WindowSetLocNEWT {
+public class WindowTopNEWT {
   private int width = 500;
   private int height = 290;
   
@@ -36,7 +36,7 @@ public class WindowSetLocNEWT {
       display.getEDTUtil().invoke(false, new Runnable() {
         @Override
         public void run() {
-          window.setTopLevelPosition(200, 200);
+          window.setAlwaysOnTop(true);
         }
       });      
     }
@@ -81,7 +81,7 @@ public class WindowSetLocNEWT {
     GLCapabilities capabilities = new GLCapabilities(profile);
     window = GLWindow.create(capabilities); 
     
-    window.setTitle("Focus test");
+    window.setTitle("AlwaysOnTop test");
     window.setPosition(100, 100);
     window.setSize(width, height);    
     
@@ -108,10 +108,10 @@ public class WindowSetLocNEWT {
   }
   
   public static void main(String[] args) {
-    WindowSetLocNEWT test;
+    WindowTopNEWT test;
     try {
-      Class<?> c = Thread.currentThread().getContextClassLoader().loadClass(WindowSetLocNEWT.class.getName());
-      test = (WindowSetLocNEWT) c.newInstance();
+      Class<?> c = Thread.currentThread().getContextClassLoader().loadClass(WindowTopNEWT.class.getName());
+      test = (WindowTopNEWT) c.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }    
